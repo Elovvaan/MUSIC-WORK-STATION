@@ -1,0 +1,16 @@
+:root { color-scheme: dark; }
+* { box-sizing: border-box; }
+body { margin: 0; font-family: Inter, Arial, sans-serif; background: #0c0f14; color: #e9eef5; }
+a { color: inherit; text-decoration: none; }
+.shell { display:grid; grid-template-columns:240px 1fr; min-height:100vh; }
+.sidebar { border-right:1px solid #212939; padding:16px; background:#111622; }
+.main { display:flex; flex-direction:column; }
+.topbar { border-bottom:1px solid #212939; padding:12px 16px; display:flex; justify-content:space-between; align-items:center; }
+.workspace { padding:16px; display:grid; gap:16px; }
+.panel { border:1px solid #263043; background:#131a28; border-radius:10px; padding:12px; }
+.grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+.grid-3 { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; }
+.nav-link { display:block; padding:8px 10px; border-radius:6px; margin-bottom:4px; }
+.nav-link:hover { background:#1b2538; }
+.control-row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+button,input,select,textarea { background:#0f1522; color:#e9eef5; border:1px solid #2b354a; border-radius:6px; padding:6px 8px; }
