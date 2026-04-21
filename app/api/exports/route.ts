@@ -6,5 +6,5 @@ export async function GET() {
 
 export async function POST(request: Request) {
   const body = await request.json().catch(() => ({}));
-  return accepted({ id: crypto.randomUUID(), ...body });
+  return accepted({ ...body, id: crypto.randomUUID() });
 }
