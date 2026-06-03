@@ -29,6 +29,8 @@ function EditorShell() { return <div className="grid-2"><div className="panel"><
 export function StudioPage({ projectId }: { projectId: string }) {
   const logTelemetry = useAppStore((s) => s.logTelemetry);
   const ensureSamplerTrack = useAppStore((s) => s.ensureSamplerTrack);
+  const transport = useAppStore((s) => s.transport);
+  const saveStatus = useAppStore((s) => s.saveStatus);
   useEffect(() => {
     ensureSamplerTrack();
     const id = setInterval(() => logTelemetry(logEvent("save", "project", { projectId })), 12000);
@@ -37,7 +39,7 @@ export function StudioPage({ projectId }: { projectId: string }) {
 
   return (
     <>
-      <section className="panel"><h1>Studio</h1><div className="control-row"><button>Metronome</button><button>Count-In</button><button>Loop</button><button>Overdub</button><button>Autosave: Active</button></div></section>
+      <section className="panel"><h1>Studio</h1><div className="control-row"><span>Metronome: {transport.metronomeEnabled ? "On" : "Off"}</span><span>Count-In: {transport.countInBars} bar</span><span>Loop: {transport.loopEnabled ? "On" : "Off"}</span><span>Autosave: {saveStatus}</span></div></section>
       <TrackList />
       <TimelineShell />
       <EditorShell />

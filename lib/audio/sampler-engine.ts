@@ -138,10 +138,6 @@ export class BrowserSamplerEngine {
     return this.context?.currentTime ?? 0;
   }
 
-  getSettings() {
-    return { ...this.settings, adsr: { ...this.settings.adsr } };
-  }
-
   async initialize() {
     if (typeof window === "undefined") return;
     if (this.context) {
@@ -181,6 +177,14 @@ export class BrowserSamplerEngine {
     this.emit({ sampleLoaded: true, sampleName: "Built-in Soft Piano C4" });
   }
 
+  get audioContext() {
+    return this.context;
+  }
+
+  getSettings() {
+    return { ...this.settings, adsr: { ...this.settings.adsr } };
+  }
+
   updateSettings(settings: SamplerSettingsPatch) {
     this.settings = { ...this.settings, ...settings, adsr: { ...this.settings.adsr, ...(settings.adsr ?? {}) } };
     if (this.masterGain) this.masterGain.gain.setTargetAtTime(this.settings.gain, this.context?.currentTime ?? 0, 0.01);
@@ -189,6 +193,20 @@ export class BrowserSamplerEngine {
 
   setBpm(bpm: number) {
     this.emit({ bpm });
+  }
+
+  click(when = this.context?.currentTime ?? 0, accent = false) {
+    if (!this.context || !this.masterGain) return;
+    const oscillator = this.context.createOscillator();
+    const gain = this.context.createGain();
+    const startAt = Math.max(this.context.currentTime, when);
+    oscillator.type = "square";
+    oscillator.frequency.setValueAtTime(accent ? 1760 : 1180, startAt);
+    gain.gain.setValueAtTime(accent ? 0.18 : 0.11, startAt);
+    gain.gain.exponentialRampToValueAtTime(0.0001, startAt + 0.045);
+    oscillator.connect(gain).connect(this.masterGain);
+    oscillator.start(startAt);
+    oscillator.stop(startAt + 0.05);
   }
 
   noteOn(note: number, velocity: number, when = this.context?.currentTime ?? 0) {

@@ -3,7 +3,8 @@
 import { PointerEvent, useEffect, useMemo, useRef, useState } from "react";
 import { samplerEngine, type SamplerRuntimeState, type SamplerSettings, type SamplerSettingsPatch } from "@/lib/audio/sampler-engine";
 import { midiRuntime, type MidiRuntimeState } from "@/lib/midi/browser-midi";
-import { useAppStore } from "@/lib/state/app-store";
+import { loadProjectState, saveProjectState } from "@/lib/persistence/browser-project-adapter";
+import { quantizeBeatToGrid, useAppStore } from "@/lib/state/app-store";
 import type { MidiClip, MidiNote } from "@/lib/types/models";
 
 const NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
@@ -66,10 +67,24 @@ export function SamplerPage() {
   const selectMidiClip = useAppStore((s) => s.selectMidiClip);
   const selectMidiNote = useAppStore((s) => s.selectMidiNote);
   const updateMidiNote = useAppStore((s) => s.updateMidiNote);
+  const hydrateProjectState = useAppStore((s) => s.hydrateProjectState);
+  const projectSnapshot = useAppStore((s) => s.projectSnapshot);
+  const markSaved = useAppStore((s) => s.markSaved);
+  const markSaving = useAppStore((s) => s.markSaving);
+  const markSaveError = useAppStore((s) => s.markSaveError);
+  const setSnapGrid = useAppStore((s) => s.setSnapGrid);
+  const quantizeSelectedNotes = useAppStore((s) => s.quantizeSelectedNotes);
+  const quantizeClip = useAppStore((s) => s.quantizeClip);
+  const setSamplerSettings = useAppStore((s) => s.setSamplerSettings);
   const midiClips = useAppStore((s) => s.midiClips);
   const selectedMidiClipId = useAppStore((s) => s.selectedMidiClipId);
   const selectedMidiNoteId = useAppStore((s) => s.selectedMidiNoteId);
   const tracks = useAppStore((s) => s.tracks);
+  const currentProject = useAppStore((s) => s.currentProject);
+  const snapGrid = useAppStore((s) => s.snapGrid);
+  const saveStatus = useAppStore((s) => s.saveStatus);
+  const lastSaveError = useAppStore((s) => s.lastSaveError);
+  const persistenceRevision = useAppStore((s) => s.persistenceRevision);
   const [audioState, setAudioState] = useState<SamplerRuntimeState>(initialAudioState);
   const [midiState, setMidiState] = useState<MidiRuntimeState>(initialMidiState);
   const [settings, setSettings] = useState<SamplerSettings>(() => samplerEngine.getSettings());
@@ -77,9 +92,41 @@ export function SamplerPage() {
   const scheduledNotes = useRef(new Set<string>());
   const dragState = useRef<DragState | null>(null);
   const recordingWasActive = useRef(false);
+  const metronomeBeat = useRef(-1);
+  const hasHydrated = useRef(false);
 
   const armedSamplerTrack = useMemo(() => tracks.find((track) => track.type === "sampler" && track.isArmed), [tracks]);
   const selectedClip = useMemo(() => midiClips.find((clip) => clip.id === selectedMidiClipId) ?? midiClips[0], [midiClips, selectedMidiClipId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    loadProjectState(currentProject?.id ?? "browser-session").then((snapshot) => {
+      if (!cancelled && snapshot) {
+        hydrateProjectState(snapshot);
+        if (snapshot.samplerSettings) {
+          samplerEngine.updateSettings(snapshot.samplerSettings);
+          setSettings(snapshot.samplerSettings);
+        }
+      }
+      hasHydrated.current = true;
+    }).catch((error) => {
+      hasHydrated.current = true;
+      markSaveError(error instanceof Error ? error.message : "Project load failed");
+    });
+    return () => { cancelled = true; };
+  }, [currentProject?.id, hydrateProjectState, markSaveError]);
+
+  useEffect(() => {
+    if (!hasHydrated.current || saveStatus !== "unsaved") return;
+    const projectId = currentProject?.id ?? "browser-session";
+    const timeout = window.setTimeout(() => {
+      markSaving();
+      saveProjectState(projectId, projectSnapshot()).then(() => {
+        markSaved();
+      }).catch((error) => markSaveError(error instanceof Error ? error.message : "Autosave failed"));
+    }, 650);
+    return () => window.clearTimeout(timeout);
+  }, [currentProject?.id, markSaveError, markSaved, markSaving, persistenceRevision, projectSnapshot, saveStatus]);
 
   useEffect(() => {
     ensureSamplerTrack();
@@ -114,7 +161,7 @@ export function SamplerPage() {
   }, [transport.bpm]);
 
   useEffect(() => {
-    if (transport.isRecording && !recordingWasActive.current) {
+    if (transport.isRecording && !recordingWasActive.current && !transport.countInActive) {
       samplerEngine.initialize().then(() => beginRecordingPass(samplerEngine.audioClockTime));
       recordingWasActive.current = true;
     }
@@ -122,7 +169,7 @@ export function SamplerPage() {
       endRecordingPass(samplerEngine.audioClockTime);
       recordingWasActive.current = false;
     }
-  }, [beginRecordingPass, endRecordingPass, transport.isRecording]);
+  }, [beginRecordingPass, endRecordingPass, transport.countInActive, transport.isRecording]);
 
   useEffect(() => {
     if (!transport.isPlaying) {
@@ -158,6 +205,7 @@ export function SamplerPage() {
       }
 
       setTransportBeat(currentBeat);
+      scheduleMetronome(currentBeat, now, secondsPerBeat);
       scheduleClipPlayback(currentBeat, now, secondsPerBeat);
     }, SCHEDULER_MS);
 
@@ -167,7 +215,15 @@ export function SamplerPage() {
       scheduledNotes.current.clear();
       samplerEngine.allNotesOff();
     };
-  }, [midiClips, setTransportBeat, transport.bpm, transport.currentBeat, transport.isPlaying, transport.loopEnabled, transport.loopEndBeat, transport.loopStartBeat]);
+  }, [midiClips, setTransportBeat, transport.bpm, transport.currentBeat, transport.isPlaying, transport.loopEnabled, transport.loopEndBeat, transport.loopStartBeat, transport.metronomeEnabled]);
+
+  function scheduleMetronome(currentBeat: number, audioNow: number, secondsPerBeat: number) {
+    if (!transport.metronomeEnabled) return;
+    const nextBeat = Math.floor(currentBeat + LOOKAHEAD_SECONDS / secondsPerBeat);
+    if (nextBeat <= metronomeBeat.current) return;
+    metronomeBeat.current = nextBeat;
+    samplerEngine.click(audioNow + Math.max(0, nextBeat - currentBeat) * secondsPerBeat, nextBeat % 4 === 0);
+  }
 
   function scheduleClipPlayback(currentBeat: number, audioNow: number, secondsPerBeat: number) {
     const lookaheadBeats = LOOKAHEAD_SECONDS / secondsPerBeat;
@@ -198,6 +254,7 @@ export function SamplerPage() {
     const merged = { ...settings, ...next, adsr: { ...settings.adsr, ...(next.adsr ?? {}) } };
     setSettings(merged);
     samplerEngine.updateSettings(next);
+    setSamplerSettings(merged);
   }
 
   function audition(note = settings.rootNote) {
@@ -216,7 +273,8 @@ export function SamplerPage() {
   function handleDrag(event: PointerEvent<HTMLElement>) {
     const drag = dragState.current;
     if (!drag) return;
-    const beatDelta = (event.clientX - drag.pointerStartX) / BEAT_WIDTH;
+    const rawBeatDelta = (event.clientX - drag.pointerStartX) / BEAT_WIDTH;
+    const beatDelta = snapGrid === "off" ? rawBeatDelta : quantizeBeatToGrid(rawBeatDelta, snapGrid);
     if (drag.type === "clip-move") updateMidiClip(drag.clipId, { startBeat: Math.max(0, drag.originalStartBeat + beatDelta), startBar: Math.floor(Math.max(0, drag.originalStartBeat + beatDelta) / 4) + 1 });
     if (drag.type === "clip-trim-left") {
       const nextStart = clamp(drag.originalStartBeat + beatDelta, 0, drag.originalStartBeat + drag.originalDuration - 1);
@@ -249,6 +307,7 @@ export function SamplerPage() {
           <button onClick={() => midiRuntime.initialize()}>{midiState.status === "ready" ? "Refresh MIDI" : "Enable MIDI"}</button>
           <button onClick={() => audition()}>Audition Root</button>
           <button onClick={() => samplerEngine.panic()}>All Notes Off</button>
+          <span>Autosave: {saveStatus}{lastSaveError ? ` (${lastSaveError})` : ""}</span>
           <select value={settings.mode} onChange={(event) => applySettings({ mode: event.target.value as SamplerSettings["mode"] })}>
             <option value="chromatic">chromatic</option>
             <option value="one_shot">one_shot</option>
@@ -337,7 +396,10 @@ export function SamplerPage() {
         <div className="control-row">
           <span>Cursor beat {transport.currentBeat.toFixed(2)}</span>
           <span>Loop {transport.loopStartBeat}–{transport.loopEndBeat}</span>
+          <label>Snap <select value={snapGrid} onChange={(event) => setSnapGrid(event.target.value as typeof snapGrid)}><option value="off">off</option><option value="1/4">1/4</option><option value="1/8">1/8</option><option value="1/16">1/16</option><option value="1/32">1/32</option></select></label>
           {selectedClip ? <button onClick={() => duplicateMidiClip(selectedClip.id)}>Duplicate selected clip</button> : null}
+          {selectedClip ? <button onClick={() => quantizeClip(selectedClip.id)}>Quantize whole clip</button> : null}
+          {selectedClip ? <button onClick={() => quantizeSelectedNotes()}>Quantize selected notes</button> : null}
           {selectedClip ? <button onClick={() => updateMidiClip(selectedClip.id, { loopEnabled: !selectedClip.loopEnabled })}>Clip loop: {selectedClip.loopEnabled ? "On" : "Off"}</button> : null}
           {selectedClip ? <button onClick={() => deleteMidiClip(selectedClip.id)}>Delete selected clip</button> : null}
         </div>
