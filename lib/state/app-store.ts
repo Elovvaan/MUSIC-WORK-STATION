@@ -82,7 +82,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     const duration = Math.max(0.03, audioTime - activeNote.startedAtAudioTime);
     const completedNote: MidiNote = { note, start: activeNote.start, duration, velocity: activeNote.velocity, channel };
     const clip: MidiClip = {
-      id: `clip-${Date.now()}-${note}-${channel}`,
+      id: globalThis.crypto?.randomUUID?.() ?? `clip-${Date.now()}-${note}-${channel}-${Math.random().toString(16).slice(2)}`,
       projectId: project.id,
       trackId: track.id,
       startBar: 1,
