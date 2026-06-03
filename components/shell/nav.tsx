@@ -3,12 +3,12 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const items = [
-  ["/", "Dashboard"], ["/studio", "Studio"], ["/ai-create", "AI Create"], ["/my-sound", "My Sound"], ["/vocal-lab", "Vocal Lab"], ["/sampler", "Sampler"], ["/performance", "Performance"], ["/mastering", "Mastering"], ["/exports", "Exports"], ["/settings", "Settings"]
+  ["/", "Dashboard"], ["/studio/demo-project", "Studio"], ["/ai-create", "AI Create"], ["/my-sound", "My Sound"], ["/vocal-lab", "Vocal Lab"], ["/sampler", "Sampler"], ["/performance", "Performance"], ["/mastering", "Mastering"], ["/exports", "Exports"], ["/settings", "Settings"]
 ] as const;
 
 function isActivePath(pathname: string, href: string) {
-  if (href === "/studio") {
-    return pathname === href || pathname.startsWith(`${href}/`);
+  if (href.startsWith("/studio/")) {
+    return pathname.startsWith("/studio/");
   }
   return pathname === href;
 }
