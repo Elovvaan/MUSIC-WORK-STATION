@@ -110,6 +110,8 @@ export class BrowserSamplerEngine {
   private voices = new Map<number, Voice[]>();
   private listeners = new Set<Listener>();
   private nextVoiceId = 1;
+  private safetySweepId?: number;
+  private windowCleanupBound = false;
   private settings: SamplerSettings = DEFAULT_SETTINGS;
   private state: SamplerRuntimeState = {
     status: "idle",
@@ -164,6 +166,8 @@ export class BrowserSamplerEngine {
       this.masterGain.connect(this.limiter).connect(this.context.destination);
       await this.loadDefaultInstrument();
       this.context.onstatechange = () => this.emit({ audioContextState: this.context?.state ?? "unavailable" });
+      this.installSafetyHandlers();
+      this.startVoiceSafetySweep();
       this.emit({ status: "ready" });
     } catch (error) {
       this.emit({ status: "error", error: error instanceof Error ? error.message : "Audio initialization failed" });
@@ -229,6 +233,22 @@ export class BrowserSamplerEngine {
     this.voices.forEach((voices) => voices.forEach((voice) => this.releaseVoice(voice, now, 0.03)));
   }
 
+  panic() {
+    if (!this.context) return;
+    const now = this.context.currentTime;
+    this.voices.forEach((voices) => voices.forEach((voice) => {
+      voice.released = true;
+      try {
+        voice.gain.gain.cancelScheduledValues(now);
+        voice.gain.gain.setValueAtTime(0.0001, now);
+        voice.source.stop(now + 0.01);
+      } catch {
+        this.removeVoice(voice);
+      }
+    }));
+    this.emit({});
+  }
+
   private releaseVoice(voice: Voice, when: number, releaseOverride?: number) {
     if (voice.released) return;
     voice.released = true;
@@ -236,7 +256,11 @@ export class BrowserSamplerEngine {
     voice.gain.gain.cancelScheduledValues(when);
     voice.gain.gain.setValueAtTime(Math.max(0.0001, voice.gain.gain.value), when);
     voice.gain.gain.exponentialRampToValueAtTime(0.0001, when + Math.max(0.01, release));
-    voice.source.stop(when + Math.max(0.012, release) + 0.02);
+    try {
+      voice.source.stop(when + Math.max(0.012, release) + 0.02);
+    } catch {
+      this.removeVoice(voice);
+    }
     this.emit({});
   }
 
@@ -244,8 +268,32 @@ export class BrowserSamplerEngine {
     const voices = (this.voices.get(voice.note) ?? []).filter((candidate) => candidate.id !== voice.id);
     if (voices.length > 0) this.voices.set(voice.note, voices);
     else this.voices.delete(voice.note);
-    voice.gain.disconnect();
+    try {
+      voice.gain.disconnect();
+    } catch {
+      // Voice may already be disconnected by a panic cleanup.
+    }
     this.emit({});
+  }
+
+  private installSafetyHandlers() {
+    if (this.windowCleanupBound || typeof window === "undefined") return;
+    this.windowCleanupBound = true;
+    window.addEventListener("blur", () => this.allNotesOff());
+    window.addEventListener("pagehide", () => this.panic());
+  }
+
+  private startVoiceSafetySweep() {
+    if (this.safetySweepId || typeof window === "undefined") return;
+    this.safetySweepId = window.setInterval(() => {
+      if (!this.context) return;
+      const now = this.context.currentTime;
+      this.voices.forEach((voices) => voices.forEach((voice) => {
+        const maxVoiceLength = this.sampleBuffer ? this.sampleBuffer.duration / Math.max(0.01, voice.source.playbackRate.value) + this.settings.adsr.release + 0.5 : 8;
+        if (voice.released && now - voice.startedAt > maxVoiceLength) this.removeVoice(voice);
+        if (!voice.released && now - voice.startedAt > 30) this.releaseVoice(voice, now, 0.03);
+      }));
+    }, 2000);
   }
 
   private activeVoiceCount() {

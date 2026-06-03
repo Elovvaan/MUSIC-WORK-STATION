@@ -8,8 +8,8 @@ export type TelemetryEventType = "save"|"export"|"reuse"|"reject"|"delete"|"repe
 
 export interface Project { id: string; name: string; bpm: number; key: string; status: "draft" | "active"; lastOpenedAt?: string; }
 export interface Track { id: string; projectId: string; type: TrackType; name: string; isMuted: boolean; isSolo: boolean; isArmed: boolean; volume: number; pan: number; }
-export interface MidiNote { note: number; start: number; duration: number; velocity: number; channel: number; }
-export interface MidiClip { id: string; projectId: string; trackId: string; startBar: number; endBar: number; notes: MidiNote[]; }
+export interface MidiNote { id?: string; note: number; start: number; duration: number; velocity: number; channel: number; }
+export interface MidiClip { id: string; projectId: string; trackId: string; startBar: number; endBar: number; startBeat: number; durationBeats: number; loopEnabled?: boolean; notes: MidiNote[]; }
 export interface PerformanceTake { id: string; projectId: string; trackId: string; sourceDeviceId: string; rawMidi: number[][]; }
 export interface MidiDeviceProfile { id: string; deviceName: string; manufacturer: string; inputPortName: string; isDefault: boolean; }
 export interface ControllerMapping { id: string; profileId: string; mappingName: string; mapping: Record<string, string>; }
