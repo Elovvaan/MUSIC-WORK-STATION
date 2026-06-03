@@ -1,0 +1,34 @@
+# Dependencies
+node_modules/
+.pnp/
+.pnp.*
+
+# Next.js / React build output
+.next/
+out/
+
+# Build output and caches
+dist/
+build/
+cache/
+.cache/
+*.tsbuildinfo
+
+# Local runtime data and handoff artifacts
+local-data/
+runtime-data/
+*.local
+.env*.local
+MUSIC-WORK-STATION-local-handoff*.zip
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# OS/editor files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
