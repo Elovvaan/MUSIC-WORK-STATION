@@ -89,7 +89,7 @@ export class BrowserMidiRuntime {
     const channel = (statusByte & 0x0f) + 1;
     const sourceName = input.name ?? "MIDI Input";
     const now = typeof performance !== "undefined" ? performance.now() : Date.now();
-    const timestamp = receivedAt || now;
+    const timestamp = receivedAt ?? now;
 
     if (command === 0x90 && data2 > 0) {
       this.heldNotes.add(data1);
