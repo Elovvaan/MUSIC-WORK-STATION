@@ -8,10 +8,10 @@ export function recordMidiIntoClip(projectId: string, trackId: string, events: A
     else {
       const start = active.get(event.note);
       if (!start) return;
-      notes.push({ note: event.note, start: start.start, duration: Math.max(0.125, event.time - start.start), velocity: start.velocity, channel: 0 });
+      notes.push({ id: crypto.randomUUID(), note: event.note, start: start.start, duration: Math.max(0.125, event.time - start.start), velocity: start.velocity, channel: 0 });
       active.delete(event.note);
     }
   });
 
-  return { id: crypto.randomUUID(), projectId, trackId, startBar: 1, endBar: 9, notes };
+  return { id: crypto.randomUUID(), projectId, trackId, startBar: 1, endBar: 9, startBeat: 0, durationBeats: 32, loopEnabled: false, notes };
 }

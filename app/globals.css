@@ -14,3 +14,16 @@ a { color: inherit; text-decoration: none; }
 .nav-link:hover { background:#1b2538; }
 .control-row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
 button,input,select,textarea { background:#0f1522; color:#e9eef5; border:1px solid #2b354a; border-radius:6px; padding:6px 8px; }
+.sampler-timeline { position: relative; height: 104px; overflow-x: auto; border:1px solid #263043; border-radius:8px; background:#0f1522; margin-top:10px; min-width:100%; }
+.timeline-gridline { position:absolute; top:0; bottom:0; width:1px; border-left:1px solid #243047; color:#74809a; font-size:10px; padding-left:3px; }
+.timeline-cursor { position:absolute; top:0; bottom:0; width:2px; background:#f97316; z-index:4; pointer-events:none; }
+.timeline-clip { position:absolute; top:34px; height:44px; border:1px solid #4f7cff; background:linear-gradient(180deg,#2448a8,#172b67); border-radius:7px; padding:7px 16px; cursor:grab; user-select:none; overflow:hidden; }
+.timeline-clip.selected { box-shadow:0 0 0 2px #93c5fd; }
+.timeline-clip small { margin-left:6px; color:#bfdbfe; }
+.clip-trim { position:absolute; top:0; bottom:0; width:8px; background:rgba(255,255,255,.16); cursor:ew-resize; }
+.clip-trim.left { left:0; }
+.clip-trim.right { right:0; }
+.piano-roll { position:relative; height:588px; overflow:auto; border:1px solid #263043; border-radius:8px; background:repeating-linear-gradient(to bottom,#101827 0,#101827 11px,#182033 12px), repeating-linear-gradient(to right,transparent 0,transparent 43px,rgba(148,163,184,.22) 44px); }
+.piano-note { position:absolute; height:11px; min-width:8px; border:1px solid #34d399; background:#047857; border-radius:3px; font-size:9px; line-height:9px; padding-left:3px; cursor:grab; user-select:none; overflow:hidden; }
+.piano-note.selected { background:#10b981; box-shadow:0 0 0 1px #a7f3d0; }
+.piano-note i { position:absolute; right:0; top:0; width:7px; bottom:0; background:rgba(255,255,255,.28); cursor:ew-resize; }

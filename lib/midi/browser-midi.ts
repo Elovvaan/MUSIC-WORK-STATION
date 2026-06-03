@@ -67,7 +67,10 @@ export class BrowserMidiRuntime {
       const requestMIDIAccess = (navigator as unknown as { requestMIDIAccess: (options?: { sysex?: boolean }) => Promise<MidiAccessLike> }).requestMIDIAccess;
       const access = await requestMIDIAccess({ sysex: false });
       this.access = access;
-      access.onstatechange = () => this.refreshInputs();
+      access.onstatechange = (event) => {
+        if (event.port.state === "disconnected") this.releaseHeldNotes(event.port.name ?? "MIDI Input");
+        this.refreshInputs();
+      };
       this.refreshInputs();
       this.emitState({ status: "ready" });
     } catch (error) {
@@ -77,7 +80,10 @@ export class BrowserMidiRuntime {
 
   private refreshInputs() {
     if (!this.access) return;
-    this.access.inputs.forEach((input) => { input.onmidimessage = (event) => this.handleMessage(input, event.data, event.receivedTime); });
+    this.access.inputs.forEach((input) => {
+      if (input.state === "disconnected") input.onmidimessage = null;
+      else input.onmidimessage = (event) => this.handleMessage(input, event.data, event.receivedTime);
+    });
     this.emitState({
       inputs: [...this.access.inputs.values()].map((input) => ({ id: input.id, name: input.name ?? "MIDI Input", manufacturer: input.manufacturer, state: input.state })),
     });
@@ -123,6 +129,15 @@ export class BrowserMidiRuntime {
       this.sustainedNotes.clear();
       notesToRelease.forEach((note) => this.dispatch({ type: "noteoff", note, velocity: 0, channel, receivedAt, sourceName }));
     }
+  }
+
+  private releaseHeldNotes(sourceName: string) {
+    const now = typeof performance !== "undefined" ? performance.now() : Date.now();
+    const notes = new Set([...this.heldNotes, ...this.sustainedNotes]);
+    this.heldNotes.clear();
+    this.sustainedNotes.clear();
+    this.emitState({ sustainActive: false });
+    notes.forEach((note) => this.dispatch({ type: "noteoff", note, velocity: 0, channel: 1, receivedAt: now, sourceName }));
   }
 
   private dispatch(event: MidiRuntimeEvent) {
