@@ -5,7 +5,7 @@ This handoff is for local Windows desktop testing of the current MIDI/audio work
 ## Requirements
 
 - **Windows 10 or Windows 11** desktop/laptop.
-- **Node.js 22 LTS recommended**. The app dependency set also supports Node.js `^18.18.0`, `^19.8.0`, or `>=20.0.0`, but Node 22 LTS matches the project tooling target.
+- **Node.js 22 LTS recommended**. This repo’s Next.js version (15.3.1) supports Node.js 18.17+ or 20.8+, and also works on Node.js 22.x; Node 22 LTS matches the project tooling target.
 - **Recommended browser:** Google Chrome or Microsoft Edge.
 - A connected audio output device such as speakers, headphones, or an audio interface.
 - Optional for MIDI testing: a USB MIDI keyboard/controller connected before browser MIDI initialization.
