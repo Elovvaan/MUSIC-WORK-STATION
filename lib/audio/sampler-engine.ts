@@ -144,6 +144,7 @@ export class BrowserSamplerEngine {
     if (typeof window === "undefined") return;
     if (this.context) {
       if (this.context.state === "suspended") await this.context.resume();
+      if (!this.sampleBuffer) await this.loadDefaultInstrument();
       this.emit({ status: "ready" });
       return;
     }
